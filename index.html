@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>타코와호프</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    :root{
+      --bg:#fffaf2; --paper:#fffdf8; --ink:#29261f; --muted:#81786d;
+      --line:#eadfce; --orange:#ef7d2d; --yellow:#f0bd3c; --green:#78a37f;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+    button,input,select,textarea{font:inherit}
+    .app{height:100%;display:grid;grid-template-rows:auto auto 1fr}
+    header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 20px;background:var(--paper);border-bottom:1px solid var(--line)}
+    .brand{font-weight:900;font-size:26px}.sub{font-size:12px;color:var(--muted);margin-top:3px}
+    .actions{display:flex;gap:8px;align-items:center}
+    .search{width:min(320px,36vw);border:1px solid var(--line);background:white;padding:10px 12px;border-radius:12px}
+    .primary{border:0;background:var(--ink);color:white;padding:10px 14px;border-radius:12px;font-weight:800;cursor:pointer}
+    .filters{padding:10px 20px;display:flex;gap:8px;flex-wrap:wrap;background:var(--paper);border-bottom:1px solid var(--line)}
+    .chip{border:1px solid var(--line);background:white;padding:8px 11px;border-radius:999px;cursor:pointer}
+    .chip.active{background:var(--ink);color:white;border-color:var(--ink)}
+    .count{margin-left:auto;color:var(--muted);font-size:13px;align-self:center}
+    .workspace{min-height:0;display:grid;grid-template-columns:minmax(320px,42%) 1fr}
+    .list{overflow:auto;padding:16px;border-right:1px solid var(--line);background:rgba(255,253,248,.86)}
+    .status{font-size:12px;color:var(--muted);padding:10px 12px;border:1px dashed var(--line);border-radius:12px;margin-bottom:12px;background:white}
+    .cards{display:grid;gap:10px}
+    .card{background:white;border:1px solid var(--line);border-radius:15px;padding:13px;cursor:pointer}
+    .card:hover,.card.active{border-color:#cfb999;box-shadow:0 8px 20px rgba(70,50,30,.08)}
+    .top{display:flex;justify-content:space-between;gap:8px}.name{font-weight:850;font-size:17px}
+    .badge{font-size:12px;padding:4px 8px;border-radius:999px;white-space:nowrap}
+    .taco{background:#fff0e5;color:#a94716}.beer{background:#fff5cf;color:#745600}.ramen{background:#fff0e8;color:#a54a24;}.etc{background:#edf6ef;color:#416b49}
+    .review{font-size:14px;color:#5f574e;margin-top:7px;line-height:1.45}
+    .meta{display:flex;gap:7px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:9px}
+    #map{width:100%;height:100%;min-height:420px}
+    dialog{border:0;padding:0;width:min(560px,92vw);border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.25);background:var(--paper)}
+    dialog::backdrop{background:rgba(30,27,22,.45)}
+    .modal-head{display:flex;justify-content:space-between;align-items:center;padding:17px 19px;border-bottom:1px solid var(--line)}
+    .modal-title{font-weight:900;font-size:21px}.close{border:0;background:transparent;font-size:24px;cursor:pointer}
+    form{padding:18px 19px 20px;display:grid;gap:12px}
+    label{display:grid;gap:5px;font-size:13px;font-weight:750}
+    input,select,textarea{border:1px solid var(--line);background:white;padding:10px;border-radius:10px}
+    textarea{min-height:70px;resize:vertical}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    .hint{font-size:12px;color:var(--muted);line-height:1.45}
+    .form-actions{display:flex;justify-content:flex-end;gap:8px}
+    .secondary{border:1px solid var(--line);background:white;padding:10px 13px;border-radius:10px;cursor:pointer}
+    .loading{opacity:.55;pointer-events:none}
+    .notice-btn{
+      position:fixed;right:14px;bottom:14px;z-index:700;
+      border:1px solid var(--line);background:rgba(255,255,255,.96);
+      color:var(--muted);padding:8px 11px;border-radius:999px;
+      font-size:12px;cursor:pointer;box-shadow:0 4px 16px rgba(60,45,30,.10)
+    }
+    .notice{padding:18px 20px 22px;line-height:1.6;font-size:14px}
+    .notice h3{margin:15px 0 5px;font-size:15px}
+    .notice p{margin:5px 0;color:#5f574e}
+    .notice ul{margin:6px 0 8px;padding-left:20px;color:#5f574e}
+    .notice .warning{
+      background:#fff4df;border:1px solid #f0d29b;border-radius:12px;
+      padding:11px 12px;margin-bottom:12px;color:#654d26
+    }
+    .icon-btn{
+      border:1px solid var(--line);background:white;color:var(--ink);
+      padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;
+      white-space:nowrap
+    }
+    .icon-btn:hover,.secondary:hover{background:#fff8eb}
+    .card-actions{display:flex;justify-content:flex-end;margin-top:10px}
+    .detail-btn{
+      border:1px solid var(--line);background:#fffaf2;color:var(--ink);
+      padding:6px 9px;border-radius:9px;font-size:12px;font-weight:750;cursor:pointer
+    }
+    .detail{padding:18px 20px 22px;display:grid;gap:10px}
+    .detail-title{font-size:24px;font-weight:900;margin:0 0 2px}
+    .detail-row{border:1px solid var(--line);background:white;border-radius:12px;padding:11px 12px}
+    .detail-key{font-size:11px;color:var(--muted);margin-bottom:4px}
+    .detail-value{font-size:14px;font-weight:650;line-height:1.5;word-break:keep-all}
+    .detail-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:4px}
+    .link-btn{
+      display:inline-block;text-decoration:none;border:1px solid var(--line);
+      background:white;color:var(--ink);padding:9px 11px;border-radius:10px;font-size:13px;font-weight:750
+    }
+    .toast{
+      position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+      z-index:1200;background:#29261f;color:white;padding:10px 14px;border-radius:999px;
+      font-size:13px;opacity:0;pointer-events:none;transition:.2s ease;
+      box-shadow:0 8px 24px rgba(0,0,0,.18)
+    }
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .sync-note{font-size:11px;color:var(--muted);margin-left:6px}
+ .mobile-tabs{
+  display:none;
+}
+
+@media(max-width:820px){
+
+  html,body{
+    height:100%;
+    overflow:hidden;
+  }
+
+  .app{
+    height:100dvh;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  header{
+    flex:0 0 auto;
+    max-height:170px;
+    overflow:hidden;
+    transition:max-height .22s ease, padding .22s ease, opacity .18s ease, border-width .22s ease;
+  }
+
+  .app.compact-mobile header{
+    max-height:0;
+    padding-top:0;
+    padding-bottom:0;
+    opacity:0;
+    border-bottom-width:0;
+    pointer-events:none;
+  }
+
+  .filters{
+    flex:0 0 auto;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  .filters::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto}
+  .count{flex:0 0 auto}
+
+  .mobile-tabs{
+    flex:0 0 auto;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px;
+    padding:8px 13px;
+    background:var(--paper);
+    border-bottom:1px solid var(--line);
+    position:relative;
+    z-index:500;
+  }
+
+  .mobile-tab{
+    border:1px solid var(--line);
+    background:white;
+    padding:10px;
+    border-radius:10px;
+    font-weight:700;
+  }
+
+  .mobile-tab.active{
+    background:var(--ink);
+    color:white;
+  }
+
+  .workspace{
+    display:block;
+    flex:1 1 auto;
+    min-height:0;
+    overflow:hidden;
+  }
+
+  .list{
+    display:block;
+    height:100%;
+    min-height:0;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  .workspace.map-mode .list{
+    display:none;
+  }
+
+  .workspace section:has(#map){
+    display:none;
+    height:100%;
+  }
+
+  .workspace.map-mode section:has(#map){
+    display:block;
+    height:100%;
+  }
+
+  #map{
+    height:100%;
+    min-height:0;
+  }
+}
+
+@media(max-width:520px){
+  header,.filters{padding-left:13px;padding-right:13px}
+  header{align-items:flex-start}
+  .actions{flex-wrap:wrap;justify-content:flex-end}
+  .search{width:100%;order:3}
+  .list{padding:13px}
+  .grid2{grid-template-columns:1fr}
+}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <div class="brand">🌮 타코와호프 🍺</div>
+      <div class="sub">강의실 사람들이 같이 채우는 맛집 지도</div>
+    </div>
+    <div class="actions">
+      <input id="search" class="search" placeholder="장소명 · 메뉴 · 한줄평 검색">
+      <button id="refreshBtn" class="icon-btn" title="다른 사람이 추가한 장소 새로고침">↻ 새로고침</button>
+      <button id="addBtn" class="primary">+ 장소 추가</button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <button class="chip active" data-filter="all">전체</button>
+    <button class="chip" data-filter="taco">🌮 타코</button>
+    <button class="chip" data-filter="beer">🍺 호프</button>
+    <button class="chip" data-filter="ramen">🍜 라멘</button>
+    <button class="chip" data-filter="etc">📍 기타</button>
+    <div id="count" class="count"></div>
+  </div>
+
+<div class="mobile-tabs">
+  <button id="listTab" class="mobile-tab active">📋 맛집 목록</button>
+  <button id="mapTab" class="mobile-tab">🗺️ 지도</button>
+</div>
+
+  <main class="workspace">
+    <section class="list">
+      <div id="status" class="status">공유 맛집 지도를 불러오는 중...</div>
+      <div id="cards" class="cards"></div>
+    </section>
+    <section><div id="map"></div></section>
+  </main>
+</div>
+
+<button id="noticeBtn" class="notice-btn">⚠️ 이용 안내</button>
+
+<dialog id="noticeDialog">
+  <div class="modal-head">
+    <div class="modal-title">⚠️ 타코와호프 이용 안내</div>
+    <button class="close" data-notice-close>×</button>
+  </div>
+  <div class="notice">
+    <div class="warning">
+      <b>타코와호프는 강의실 구성원끼리 맛집을 공유하기 위한 비상업적 테스트 서비스(MVP)입니다.</b>
+    </div>
+
+    <h3>개인정보를 입력하지 마세요</h3>
+    <p>등록한 내용은 다른 이용자에게 공개될 수 있습니다. 공개되어도 괜찮은 맛집 정보만 작성해주세요.</p>
+    <ul>
+      <li>실명, 전화번호, 이메일</li>
+      <li>집 주소 등 개인의 위치정보</li>
+      <li>계정·비밀번호 등 로그인 정보</li>
+      <li>타인의 개인정보 또는 공개되면 곤란한 내용</li>
+    </ul>
+    <p><b>등록자는 실명 대신 닉네임 사용을 권장합니다.</b></p>
+
+    <h3>등록 내용은 다른 이용자에게 보입니다</h3>
+    <p>장소명, 추천 메뉴, 한줄평, 닉네임 등 작성한 내용은 사이트 이용자에게 표시될 수 있습니다.</p>
+
+    <h3>테스트 서비스입니다</h3>
+    <p>현재 버전에는 회원가입·본인인증 등 강력한 접근제어 기능이 없습니다. 데이터가 수정·삭제되거나 서비스가 예고 없이 변경될 수 있으므로 중요한 정보를 보관하지 마세요.</p>
+
+    <h3>외부 서비스 사용</h3>
+    <p>서비스 운영을 위해 Google Sheets·Google Apps Script 및 Netlify 등의 외부 서비스를 사용할 수 있습니다. 맛집 공유에 필요하지 않은 개인정보는 입력받지 않는 것을 원칙으로 합니다.</p>
+
+    <p style="margin-top:16px"><b>장소 추천만 가볍게 남겨주세요! 🌮🍺</b></p>
+
+    <div class="form-actions" style="margin-top:18px">
+      <button type="button" class="secondary" data-notice-close>취소</button>
+      <button type="button" class="primary" id="noticeConfirmBtn">확인했습니다</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="addDialog">
+  <div class="modal-head">
+    <div class="modal-title">새 장소 추가</div>
+    <button class="close" data-close>×</button>
+  </div>
+  <form id="addForm">
+    <label>장소명<input name="name" required maxlength="60" autocomplete="off" placeholder="예: 타코스탠드"></label>
+    <div class="grid2">
+      <label>카테고리
+        <select name="category">
+          <option value="taco">🌮 타코</option>
+          <option value="beer">🍺 호프</option>
+          <option value="ramen">🍜 라멘</option>
+          <option value="etc">📍 기타</option>
+        </select>
+      </label>
+      <label>등록자<input name="author" maxlength="30" autocomplete="off" placeholder="실명 대신 닉네임 권장"></label>
+    </div>
+    <label>주소<input name="address" required maxlength="150" autocomplete="off" placeholder="예: 서울특별시 마포구 망원동 386-3"></label>
+    <div class="hint">
+      주소만 입력하면 Google Apps Script가 자동으로 위도·경도를 찾아 저장합니다.
+      위치 검색에 실패한 경우에는 목록에는 저장되고 지도에는 "위치 미등록"으로 표시됩니다.
+    </div>
+    <label>추천 메뉴<input name="menu" maxlength="80" autocomplete="off" placeholder="예: 알 파스토르 타코"></label>
+    <label>한줄평<textarea name="review" maxlength="140" placeholder="140자 이내로 가볍게 남겨주세요"></textarea></label>
+    <div class="form-actions">
+      <button type="button" class="secondary" data-close>취소</button>
+      <button class="primary" id="submitBtn" type="submit">등록하기</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="detailDialog">
+  <div class="modal-head">
+    <div class="modal-title">장소 상세</div>
+    <button class="close" data-detail-close>×</button>
+  </div>
+  <div id="detailContent" class="detail"></div>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // ★ Apps Script 웹 앱 배포 후 받은 URL을 여기에 넣으세요.
+  const API_URL = "https://script.google.com/macros/s/AKfycbzmX96at_T_ALe6bAt_T9ScFs6Ritw0dgimK45tvqWjF6GWCdb4rPd7plf1ZPgFV7DeLQ/exec";
+
+  let places = [];
+  let filter = "all";
+  let query = "";
+  let activeId = null;
+
+  const meta = {
+    taco:{label:"🌮 타코", cls:"taco", emoji:"🌮"},
+    beer:{label:"🍺 호프", cls:"beer", emoji:"🍺"},
+    ramen:{label:"🍜 라멘", cls:"ramen", emoji:"🍜"},
+    etc:{label:"📍 기타", cls:"etc", emoji:"📍"}
+  };
+
+  const map = L.map("map").setView([37.5665,126.9780], 12);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    maxZoom:19, attribution:"&copy; OpenStreetMap"
+  }).addTo(map);
+
+  const markerLayer = L.layerGroup().addTo(map);
+  const markers = new Map();
+
+  function esc(v){
+    return String(v ?? "").replace(/[&<>"']/g,s=>({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[s]));
+  }
+
+  async function loadPlaces(options = {}){
+    const status = document.getElementById("status");
+    const silent = Boolean(options.silent);
+    if(!silent) status.textContent = "공유 맛집 지도를 불러오는 중...";
+    try{
+      const res = await fetch(API_URL + "?action=list");
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      places = Array.isArray(data) ? data : (data.data || []);
+      const now = new Date();
+      status.innerHTML = `공유 저장소 연결됨 · ${places.length}곳 등록 <span class="sync-note">마지막 동기화 ${now.toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</span>`;
+      render();
+      if(!silent) fitMap();
+    }catch(err){
+      console.error(err);
+      status.innerHTML = `⚠️ 아직 공유 저장소가 연결되지 않았어요.<br>
+      <b>index.html</b>의 API_URL에 Apps Script 웹 앱 URL을 넣어주세요.`;
+      places = [];
+      render();
+    }
+  }
+
+  function filtered(){
+    return places.filter(p=>{
+      const mf = filter === "all" || p.category === filter;
+      const hay = `${p.name||""} ${p.menu||""} ${p.review||""} ${p.author||""}`.toLowerCase();
+      return mf && hay.includes(query.toLowerCase());
+    });
+  }
+
+  function render(){
+    const list = filtered();
+    document.getElementById("count").textContent = `${list.length}곳`;
+    const cards = document.getElementById("cards");
+    cards.innerHTML = "";
+
+    if(!list.length){
+      cards.innerHTML = `<div class="card" style="text-align:center;color:#81786d">등록된 장소가 아직 없어요.</div>`;
+    }
+
+    list.forEach(p=>{
+      const m = meta[p.category] || meta.etc;
+      const card = document.createElement("article");
+      card.className = "card" + (activeId == p.id ? " active":"");
+      card.innerHTML = `
+        <div class="top">
+          <div class="name">${esc(p.name)}</div>
+          <span class="badge ${m.cls}">${m.label}</span>
+        </div>
+        <div class="review">${p.review ? `“${esc(p.review)}”` : "한줄평 미등록"}</div>
+        <div class="meta">
+          <span>🍽️ ${esc(p.menu || "메뉴 미등록")}</span>
+          <span>👤 ${esc(p.author || "익명")}</span>
+          <span>${p.lat && p.lng ? "🗺️ 지도 등록됨":"📌 위치 미등록"}</span>
+        </div>
+        <div class="card-actions">
+          <button class="detail-btn" type="button">상세 보기</button>
+        </div>`;
+      card.onclick = ()=> selectPlace(p);
+      card.querySelector(".detail-btn").onclick = (event)=>{
+        event.stopPropagation();
+        showDetail(p);
+      };
+      cards.appendChild(card);
+    });
+
+    markerLayer.clearLayers();
+    markers.clear();
+
+    list.forEach(p=>{
+      const lat = Number(p.lat), lng = Number(p.lng);
+      if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const m = meta[p.category] || meta.etc;
+      const icon = L.divIcon({
+        className:"",
+        html:`<div style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:white;border:2px solid #2c2922;box-shadow:0 3px 8px rgba(0,0,0,.2);font-size:18px">${m.emoji}</div>`,
+        iconSize:[34,34],iconAnchor:[17,17]
+      });
+      const marker = L.marker([lat,lng],{icon})
+        .bindPopup(`<b>${esc(p.name)}</b><br>${m.label}<br>${esc(p.menu || "")}`)
+        .addTo(markerLayer);
+      markers.set(String(p.id), marker);
+    });
+  }
+
+  function selectPlace(p){
+    activeId = p.id;
+    render();
+    const lat = Number(p.lat), lng = Number(p.lng);
+    if(Number.isFinite(lat) && Number.isFinite(lng)){
+      map.flyTo([lat,lng],15,{duration:.5});
+      setTimeout(()=>markers.get(String(p.id))?.openPopup(),500);
+    }
+  }
+
+  function showDetail(p){
+    const m = meta[p.category] || meta.etc;
+    const lat = Number(p.lat), lng = Number(p.lng);
+    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+    const naverQuery = encodeURIComponent((p.name || "").trim());
+    const naverUrl = `https://map.naver.com/p/search/${naverQuery}`;
+
+    document.getElementById("detailContent").innerHTML = `
+      <h2 class="detail-title">${m.emoji} ${esc(p.name)}</h2>
+      <div class="detail-row">
+        <div class="detail-key">카테고리</div>
+        <div class="detail-value">${m.label}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-key">주소</div>
+        <div class="detail-value">${esc(p.address || "주소 미등록")}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-key">추천 메뉴</div>
+        <div class="detail-value">${esc(p.menu || "아직 등록되지 않았어요")}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-key">한줄평</div>
+        <div class="detail-value">${esc(p.review || "아직 등록되지 않았어요")}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-key">등록자</div>
+        <div class="detail-value">${esc(p.author || "익명")}</div>
+      </div>
+      <div class="detail-actions">
+        ${hasCoords ? `<button class="secondary" type="button" id="detailMapBtn">지도 위치 보기</button>` : ""}
+        <a class="link-btn" href="${naverUrl}" target="_blank" rel="noopener noreferrer">네이버 지도에서 확인 ↗</a>
+      </div>
+    `;
+
+    const dlg = document.getElementById("detailDialog");
+    dlg.showModal();
+
+    const mapBtn = document.getElementById("detailMapBtn");
+    if(mapBtn){
+      mapBtn.onclick = ()=>{
+        dlg.close();
+        selectPlace(p);
+      };
+    }
+  }
+
+  function showToast(message){
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.classList.add("show");
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(()=>toast.classList.remove("show"), 2400);
+  }
+
+  function fitMap(){
+    const pts = places
+      .map(p=>[Number(p.lat),Number(p.lng)])
+      .filter(([a,b])=>Number.isFinite(a)&&Number.isFinite(b));
+    if(pts.length === 1) map.setView(pts[0],15);
+    if(pts.length > 1) map.fitBounds(pts,{padding:[40,40]});
+  }
+
+  document.querySelectorAll(".chip").forEach(btn=>{
+    btn.onclick = ()=>{
+      document.querySelectorAll(".chip").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      filter = btn.dataset.filter;
+      render();
+    };
+  });
+
+  document.getElementById("search").oninput = e=>{
+    query = e.target.value;
+    render();
+  };
+
+  document.getElementById("refreshBtn").onclick = async ()=>{
+    const btn = document.getElementById("refreshBtn");
+    const old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "↻ 불러오는 중";
+    await loadPlaces({silent:true});
+    btn.textContent = old;
+    btn.disabled = false;
+    showToast("최신 장소 목록으로 새로고침했어요.");
+  };
+
+  document.querySelectorAll("[data-detail-close]").forEach(b=>{
+    b.onclick = ()=>document.getElementById("detailDialog").close();
+  });
+
+  const dialog = document.getElementById("addDialog");
+  document.getElementById("addBtn").onclick = ()=>{
+    noticeDialog.dataset.next = "add";
+    noticeDialog.showModal();
+  };
+  document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>dialog.close());
+
+  document.getElementById("addForm").onsubmit = async e=>{
+    e.preventDefault();
+
+    if(!API_URL || API_URL.includes("PASTE_YOUR")){
+      alert("먼저 index.html의 API_URL에 Apps Script 웹 앱 URL을 넣어주세요.");
+      return;
+    }
+
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const payload = Object.fromEntries(fd.entries());
+
+    const submitBtn = document.getElementById("submitBtn");
+    form.classList.add("loading");
+    submitBtn.disabled = true;
+    const oldSubmitText = submitBtn.textContent;
+    submitBtn.textContent = "저장 중...";
+
+    try{
+      const res = await fetch(API_URL,{
+        method:"POST",
+        headers:{"Content-Type":"text/plain;charset=utf-8"},
+        body:JSON.stringify({action:"add", ...payload})
+      });
+      const data = await res.json();
+      if(data.ok === false) throw new Error(data.message || "저장 실패");
+
+      form.reset();
+
+      if(dialog.open){
+        dialog.close();
+      }
+
+      await loadPlaces({silent:true});
+
+      if(data.data && (!data.data.lat || !data.data.lng)){
+        showToast("저장은 됐지만 지도 위치를 찾지 못했어요.");
+      }else{
+        showToast("맛집이 지도에 추가됐어요! 🌮🍺");
+      }
+    }catch(err){
+      console.error(err);
+      alert("등록에 실패했어요. Apps Script 배포 설정을 확인해 주세요.");
+    }finally{
+      form.classList.remove("loading");
+      submitBtn.disabled = false;
+      submitBtn.textContent = oldSubmitText;
+    }
+  };
+
+  const noticeDialog = document.getElementById("noticeDialog");
+
+  document.getElementById("noticeBtn").onclick = ()=>{
+    noticeDialog.dataset.next = "";
+    noticeDialog.showModal();
+  };
+
+  document.querySelectorAll("[data-notice-close]").forEach(b=>{
+    b.onclick = ()=>{
+      noticeDialog.dataset.next = "";
+      noticeDialog.close();
+    };
+  });
+
+  document.getElementById("noticeConfirmBtn").onclick = ()=>{
+    const shouldOpenAdd = noticeDialog.dataset.next === "add";
+    noticeDialog.dataset.next = "";
+    noticeDialog.close();
+
+    if(shouldOpenAdd){
+      setTimeout(()=>dialog.showModal(), 80);
+    }
+  };
+
+const workspace = document.querySelector(".workspace");
+const listTab = document.getElementById("listTab");
+const mapTab = document.getElementById("mapTab");
+
+listTab.onclick = () => {
+  workspace.classList.remove("map-mode");
+
+  listTab.classList.add("active");
+  mapTab.classList.remove("active");
+};
+
+mapTab.onclick = () => {
+  workspace.classList.add("map-mode");
+
+  mapTab.classList.add("active");
+  listTab.classList.remove("active");
+
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 100);
+};
+
+  // 모바일: 목록을 위로 밀어 올리면 상단 제목/검색 영역을 접어 화면을 넓게 사용
+  const app = document.querySelector(".app");
+  const mobileList = document.querySelector(".list");
+  let lastMobileScrollTop = 0;
+
+  function updateMobileHeader(){
+    if(window.innerWidth > 820){
+      app.classList.remove("compact-mobile");
+      return;
+    }
+
+    const current = mobileList.scrollTop;
+
+    // 아래로 스크롤(콘텐츠를 위로 올림)하면 헤더 숨김
+    if(current > 36 && current > lastMobileScrollTop + 2){
+      app.classList.add("compact-mobile");
+    }
+
+    // 목록 맨 위로 돌아오면 헤더 다시 표시
+    if(current < 12){
+      app.classList.remove("compact-mobile");
+    }
+
+    lastMobileScrollTop = current;
+  }
+
+  mobileList.addEventListener("scroll", updateMobileHeader, {passive:true});
+  window.addEventListener("resize", updateMobileHeader);
+
+  loadPlaces();
+</script>
+</body>
+</html>
